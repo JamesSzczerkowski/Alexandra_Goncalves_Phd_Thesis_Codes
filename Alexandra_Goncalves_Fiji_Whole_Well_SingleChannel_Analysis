@@ -2,7 +2,7 @@
 					// use in conjuction with Master Macro to 
 	
 									
-Marco_Name = "XanaMedianBKG_Analysis";	
+Marco_Name = "MedianBKG_Analysis";	
 								
 					setOption("ExpandableArrays", true);
 					string = getArgument(); 
