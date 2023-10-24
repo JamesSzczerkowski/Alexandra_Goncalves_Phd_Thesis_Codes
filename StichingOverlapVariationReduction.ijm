@@ -1,0 +1,137 @@
+
+					// use in conjuction with Master Macro to 
+	
+									
+Marco_Name = "XanaMedianBKG_Analysis";	
+								
+					setOption("ExpandableArrays", true);
+					string = getArgument(); 
+					if (string.contains(" ; ")) {
+						Input = Str2Array(string, " ; "); 	
+						selectWindow("Script Info Table");	Chans = Table.getColumn("Channel Names");		ChanNames = Table.getColumn("Given Names"); 	
+						ReferenceChan = Table.getColumn("'Red' reference channel");							ChanColours = Table.getColumn("Channel Colours"); 
+						Reorder = Table.getColumn("Channels Reorded"); 
+						ReorderNames = newArray(Chans.length);		Chanfunction = newArray(Chans.length);		
+						for (Ch = 0; Ch < Chans.length; Ch++) {ReorderNames[Ch] = ChanNames[Reorder[Ch]-1]; Chanfunction[Ch] = Chans[Reorder[Ch]-1];  if(ReferenceChan[Ch]==1){  RefChan = Ch+1;  }}		
+						  }
+																				
+																																													
+					if (string.contains("Channel Options")) 	 	{ return "Dapi , Nuclear , Cytoplamic , Membrane";  }
+					if (string.contains("Channel Order")) 	 		{ return "1 , 2 , 3 , 4";  }
+					if (string.contains("Folder Exclusion")) 		{ return "ImagesAnalysed , SideFaceAveraging , GLIMAnalysis";  } 
+					if (string.contains("Image Processing")) 		{ return "Keep Zstack , TestArray";  } 
+					if (string.contains("Image PreProcessing")) 	{ return "Create Masks , TestArray";  } 
+					if (string.contains("Analysis sections")) 		{ return "Analyse coverslip";  }  //   "Analyse coverslip , Info to Normalise , Select ROIs , Exstract Data"
+					if (string.contains("Sections info required")) 	{ return "No info required , No info required  , No info required , No info required ";  } 					
+//print("Function section in function: " + Input[0]);		
+			//  Path = Input[2] + "\\" + "ImagesAnalysed";	
+			//  BKGpath = Path + "\\" + "BKGImages";
+//print("Function Running: "+ Marco_Name);
+
+if (string.contains("Analyse coverslip")){
+	if(isOpen("Xana analysis")==0){Table.create("Xana analysis"); Table.update;}
+	list  = Str2Array(Input[3], " , ");	
+    selectWindow("Xana analysis");
+	Table.set("Folder", Table.size, Input[1]);
+	Table.set("Image" , Table.size-1, list[0]);
+	Table.update;
+	//printArray("Input", Input);
+	list  = Str2Array(Input[3], " , ");	
+	open(Input[2]+"\\"+list[0]);
+	closeWindows(newArray("Im",  "Result of Im", "Result of Median" , "Median" , "MBlur", "StichEdge" , "Skel" , "BranchPoint","Result of Skel", "Mask of Result of Skel"  , "Dilate"));
+	closeWindows(newArray("Int", "Mask of Dilate" ,  "Im2", "Result of Result of Im"));
+	
+	run("Duplicate...", "title=Im");
+	run("Duplicate...", "title=Median");
+	run("Median...", "radius=25");
+	selectWindow("Median");
+	imageCalculator("Subtract create", "Im","Median");
+	
+	run("Duplicate...", "title=Int");
+	
+	selectImage("Result of Im");
+	run("Select None");
+	
+	run("Clear Results");
+	run("Measure");
+	run("Subtract...", "value="+(getResult("Mean", 0)+getResult("StdDev", 0)));
+	
+	
+	run("Duplicate...", "title=Im2");
+	setAutoThreshold("Huang dark no-reset");
+	run("Create Selection");
+	roiManager("reset");
+	roiManager("Add");
+	run("Select None");
+	
+	
+	roiManager("Select", 0);
+	run("Maximum...", "radius=5");
+	run("Gaussian Blur...", "sigma=10");
+	run("Maximum...", "radius=10");
+	imageCalculator("Subtract create", "Result of Im","Im2");
+	selectImage("Result of Result of Im");
+	//run("Brightness/Contrast...");
+	run("Enhance Contrast", "saturated=0.35");
+	resetMinAndMax();
+	setAutoThreshold("Huang dark no-reset");
+	//run("Threshold...");
+	run("Convert to Mask");
+	run("Watershed");
+	
+	run("Analyze Particles...", "size=5-Infinity circularity=0.50-1.00 clear add");
+	selectImage("Int");
+	roiManager("Show All");
+	run("Clear Results");
+	roiManager("Measure");
+	
+	
+	roiManager("Show All without labels");
+	n = roiManager("count");
+	run("Summarize");
+	MeanSz = getResult("Area", n+1);  StdSz = getResult("Area", n+2);
+	MeanInt = getResult("Mean", n+1);  StdInt = getResult("Mean", n+2);
+	
+	//print(n,MeanSz,StdSz,MeanInt,StdInt);
+	selectWindow("Xana analysis");
+	Table.set("Cell count" , Table.size-1, n);
+	Table.set("MeanSz" , Table.size-1, MeanSz);
+	Table.set("StdSz"  , Table.size-1, StdSz);
+	Table.set("MeanInt", Table.size-1, MeanInt);
+	Table.set("StdInt" , Table.size-1, StdInt);
+	Table.update;
+	
+	close("*");
+}
+
+
+function closeWindows(array){
+				// close windows with inpit array 
+				for (i2 = 0; i2 < 3; i2++) {		
+				for (i = 0; i < array.length; i++) { if(isOpen(array[i])){selectWindow(array[i]);  run("Close");}}
+			}}
+						
+					
+function Str2Array(string, divider) {
+				// sort arguments from string (if needed)
+				LIn=string.length; Div=divider.length;
+				Arg=newArray; i =0; prePos = 0; Folder_Exclusion = "nan";
+				for (It = Div; It < LIn; It++){ // GetFolder Inout Name
+					if (substring(string,It-Div,It) == divider) {
+						Arg[i] = substring(string,prePos,It);
+						Arg[i]=Arg[i].replace(divider,"");
+						prePos = It; i++;	
+				}}
+				Arg[i] = substring(string,prePos,LIn);
+			return Arg;
+			 }
+			 
+	 
+	//  -----------------------------------------------------------------------------------------------------\\
+///////// ------------------------------   function printArray   ------------------------------------ \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+	//  -----------------------------------------------------------------------------------------------------\\							
+			function printArray(title, a) {
+			      print(title);
+			      for (i=0; i<a.length; i++)
+			          print("  "+i+" "+a[i]);
+			  }	 			 
